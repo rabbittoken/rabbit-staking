@@ -700,7 +700,7 @@
     "ethereumjs-util" "^6.1.0"
     "fs-extra" "^7.0.1"
 
-"@nomiclabs/buidler-waffle@^2.0.0":
+"@nomiclabs/buidler-waffle@^2.1.0":
   "integrity" "sha512-Z1SJOGrRCcSu9E87mFaBHi4QimNxP9ZTYtJwLZCcyszS1fi0XLgp4syzTH3QXrQUBOP2P5oQMD6uCp0gNNS3hw=="
   "resolved" "https://registry.npmjs.org/@nomiclabs/buidler-waffle/-/buidler-waffle-2.1.0.tgz"
   "version" "2.1.0"
@@ -808,10 +808,10 @@
     "find-up" "^4.1.0"
     "fs-extra" "^8.1.0"
 
-"@openzeppelin/test-helpers@^0.5.6":
-  "integrity" "sha512-agXr5Rn/q0MCDaU0ioYMGQVjY32Ln3Ae3cyQKtESuKdDoEZ7g3Y7x4eUbT779OE9nQ+xQCytmVqjKvZvajURug=="
-  "resolved" "https://registry.npmjs.org/@openzeppelin/test-helpers/-/test-helpers-0.5.10.tgz"
-  "version" "0.5.10"
+"@openzeppelin/test-helpers@^0.5.0":
+  "integrity" "sha512-HkFpCjtTD8dk+wdYhsT07YbMGCE+Z4Wp5sBKXvPDF3Lynoc0H2KqZgCWV+qr2YZ0WW1oX/sXkKFrrKJ0caBTjw=="
+  "resolved" "https://registry.npmjs.org/@openzeppelin/test-helpers/-/test-helpers-0.5.11.tgz"
+  "version" "0.5.11"
   dependencies:
     "@openzeppelin/contract-loader" "^0.6.2"
     "@truffle/contract" "^4.0.35"
@@ -978,17 +978,17 @@
   "resolved" "https://registry.npmjs.org/@sindresorhus/is/-/is-0.7.0.tgz"
   "version" "0.7.0"
 
+"@solidity-parser/parser@^0.12.0":
+  "integrity" "sha512-d7VS7PxgMosm5NyaiyDJRNID5pK4AWj1l64Dbz0147hJgy5k2C0/ZiKK/9u5c5K+HRUVHmp+RMvGEjGh84oA5Q=="
+  "resolved" "https://registry.npmjs.org/@solidity-parser/parser/-/parser-0.12.2.tgz"
+  "version" "0.12.2"
+
 "@solidity-parser/parser@^0.5.2":
   "integrity" "sha512-uRyvnvVYmgNmTBpWDbBsH/0kPESQhQpEc4KsvMRLVzFJ1o1s0uIv0Y6Y9IB5vI1Dwz2CbS4X/y4Wyw/75cTFnQ=="
   "resolved" "https://registry.npmjs.org/@solidity-parser/parser/-/parser-0.5.2.tgz"
   "version" "0.5.2"
 
 "@solidity-parser/parser@^0.8.0":
-  "integrity" "sha512-8LySx3qrNXPgB5JiULfG10O3V7QTxI/TLzSw5hFQhXWSkVxZBAv4rZQ0sYgLEbc8g3L2lmnujj1hKul38Eu5NQ=="
-  "resolved" "https://registry.npmjs.org/@solidity-parser/parser/-/parser-0.8.2.tgz"
-  "version" "0.8.2"
-
-"@solidity-parser/parser@^0.8.1":
   "integrity" "sha512-8LySx3qrNXPgB5JiULfG10O3V7QTxI/TLzSw5hFQhXWSkVxZBAv4rZQ0sYgLEbc8g3L2lmnujj1hKul38Eu5NQ=="
   "resolved" "https://registry.npmjs.org/@solidity-parser/parser/-/parser-0.8.2.tgz"
   "version" "0.8.2"
@@ -8742,12 +8742,12 @@
     "semver" "^5.5.0"
     "tmp" "0.0.33"
 
-"solidity-coverage@^0.7.13":
-  "integrity" "sha512-06r0R+/j8lgl5/Z57VwxWNFZId0ZavcQU45W2gCfsBmEt/1Y6Xgm96oMSa6JBIvwrPR8H4T3icxTLiUVsMFNeg=="
-  "resolved" "https://registry.npmjs.org/solidity-coverage/-/solidity-coverage-0.7.13.tgz"
-  "version" "0.7.13"
+"solidity-coverage@^0.7.16":
+  "integrity" "sha512-ttBOStywE6ZOTJmmABSg4b8pwwZfYKG8zxu40Nz+sRF5bQX7JULXWj/XbX0KXps3Fsp8CJXg8P29rH3W54ipxw=="
+  "resolved" "https://registry.npmjs.org/solidity-coverage/-/solidity-coverage-0.7.16.tgz"
+  "version" "0.7.16"
   dependencies:
-    "@solidity-parser/parser" "^0.8.1"
+    "@solidity-parser/parser" "^0.12.0"
     "@truffle/provider" "^0.2.24"
     "chalk" "^2.4.2"
     "death" "^1.1.0"

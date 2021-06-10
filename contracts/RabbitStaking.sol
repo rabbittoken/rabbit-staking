@@ -9,13 +9,8 @@ import './interfaces/IPancakeRouter01.sol';
 import "./RabbitToken.sol"; //BEP20Token
 
 interface IMigratorRabbit {
-    // Perform LP token migration from legacy PancakeSwap to CakeSwap.
-    // Take the current LP token address and return the new LP token address.
-    // Migrator should have full access to the caller's LP token.
-    // Return the new LP token address.
-    //
-    // XXX Migrator must have allowance access to PancakeSwap LP tokens.
-    // CakeSwap must mint EXACTLY the same amount of CakeSwap LP tokens or
+    // XXX Migrator must have allowance access to RabbitSwap/pancakeSwap LP tokens.
+    // RabbitSwap must mint EXACTLY the same amount of RabbitSwap LP tokens or
     // else something bad will happen. Traditional PancakeSwap does not
     // do that so be careful!
     function migrate(IBEP20 token) external returns (IBEP20);
@@ -36,25 +31,13 @@ contract RabbitStaking is Ownable {
     struct UserInfo {
         uint256 amount;     // How many LP tokens the user has provided.
         uint256 rewardDebt; // Reward debt. See explanation below.
-        uint256 lastRewardBlock;
-        //
-        // We do some fancy math here. Basically, any point in time, the amount of RBTs
-        // entitled to a user but is pending to be distributed is:
-        //
-        //   pending reward = (user.amount * pool.accRabbitPerShare) - user.rewardDebt
-        //
-        // Whenever a user deposits or withdraws LP tokens to a pool. Here's what happens:
-        //   1. The pool's `accRabbitPerShare` (and `lastRewardBlock`) gets updated.
-        //   2. User receives the pending reward sent to his/her address.
-        //   3. User's `amount` gets updated.
-        //   4. User's `rewardDebt` gets updated.
     }
 
     // Info of each pool.
     struct PoolInfo {
         IBEP20 lpToken;           // Address of LP token contract.
-        uint256 tokenDecimal;
-        uint256 allocPoint;       // How many allocation points assigned to this pool. RBTs to distribute per block.
+        string symbol;
+        uint256 allocPoint;
         uint256 lastRewardBlock;  // Last block number that RBTs distribution occurs.
         uint256 accRabbitPerShare; // Accumulated RBTs per share, times 1e12. See below.
         uint256 stakedAmount;
@@ -67,30 +50,33 @@ contract RabbitStaking is Ownable {
     uint256 public rabbitPerBlock;
     // Bonus muliplier for early rabbit makers.
     uint256 public BONUS_MULTIPLIER = 1;
-	// pancakeRouter mainnet@bsc
-	// IPancakeRouter01 pancakeRouter = IPancakeRouter01(0x10ED43C718714eb63d5aA57B78B54704E256024E);
-    // pancakeRouter mainnet@bsctestnet
-    IPancakeRouter01 pancakeRouter = IPancakeRouter01(0xD99D1c33F9fC3444f8101754aBC46c52416550D1);
 
     // BNB @bsc
-	address public WETH = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
-	// BNB @bsctestnet
-	address public WETH_test = 0xaE8E19eFB41e7b96815649A6a60785e1fbA84C1e;
+    // address public WETH = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
+    // BNB @bsctestnet
+    // address public WETH = 0xaE8E19eFB41e7b96815649A6a60785e1fbA84C1e;
 
-    address[] path;
+    // swapRouter mainnet@bsc
+    // IPancakeRouter01 swapRouter;
 
     // Info of each pool.
     PoolInfo[] public poolInfo;
     // mapping (uint256 => PoolInfo) public poolInfo;
     // Info of each user that stakes LP tokens.
-    mapping (uint256 => mapping (address => UserInfo)) public userInfo;
+    mapping(uint256 => mapping(address => UserInfo)) public userInfo;
     // Total allocation points. Must be the sum of all allocation points in all pools.
     uint256 public totalAllocPoint = 0;
     // The block number when RBT mining starts.
     uint256 public startBlock;
 
-    bool public is_mountained = false;
-    IMigratorRabbit public migrator;
+    bool public open_deposit = true;
+    bool public open_withdraw = true;
+    bool public open_client = true;
+
+    uint256 private decimal_helper = 1e12;
+
+    IMigratorRabbit private migrator;
+    bool private is_migrator = false;
 
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
@@ -103,41 +89,46 @@ contract RabbitStaking is Ownable {
         rabbit = _rabbit;
         rabbitPerBlock = _rabbitPerBlock;
         startBlock = _startBlock;
+        // swapRouter = IPancakeRouter01(_swapRouter);
 
-        uint256 _base = 10;
         // staking pool
         poolInfo.push(PoolInfo({
-            lpToken: _rabbit,
-            tokenDecimal: _base ** _rabbit.decimals(),
-            allocPoint: 1000,
-            lastRewardBlock: startBlock,
-            accRabbitPerShare: 0,
+            lpToken : _rabbit,
+            symbol: _rabbit.symbol(),
+            lastRewardBlock : startBlock,
+            accRabbitPerShare : 0,
+            allocPoint : 1000,
             stakedAmount: 0,
             rewardSent: 0
         }));
 
         totalAllocPoint = 1000;
-
-        path = new address[](2);
-        path[0] = address(rabbit);
-        path[1] = WETH;
     }
 
     function updateMultiplier(uint256 multiplierNumber) public onlyOwner {
         BONUS_MULTIPLIER = multiplierNumber;
     }
 
-    function setOffline(bool is_online) public onlyOwner {
-        is_mountained = is_online;
+    function setDeposit(bool _switch) public onlyOwner {
+        open_deposit = _switch;
+    }
+
+    function setWithdraw(bool _switch) public onlyOwner {
+        open_withdraw = _switch;
+    }
+
+    function setClient(bool _switch) public onlyOwner {
+        open_client = _switch;
     }
 
     function poolLength() external view returns (uint256) {
         return poolInfo.length;
     }
 
-    function getRewardPerBlock() external view returns (uint256){
-        return rabbitPerBlock;
+    function setRewardPerBlock(uint256 _reward) public onlyOwner{
+        rabbitPerBlock = _reward;
     }
+
 
     // Add a new lp to the pool. Can only be called by the owner.
     // XXX DO NOT add the same LP token more than once. Rewards will be messed up if you do.
@@ -147,13 +138,12 @@ contract RabbitStaking is Ownable {
         }
         uint256 lastRewardBlock = block.number > startBlock ? block.number : startBlock;
         totalAllocPoint = totalAllocPoint.add(_allocPoint);
-        uint256 _base = 10;
         poolInfo.push(PoolInfo({
-            lpToken: _lpToken,
-            tokenDecimal: _base ** _lpToken.decimals(),
-            allocPoint: _allocPoint,
-            lastRewardBlock: lastRewardBlock,
-            accRabbitPerShare: 0,
+            lpToken : _lpToken,
+            symbol: _lpToken.symbol(),
+            lastRewardBlock : lastRewardBlock,
+            accRabbitPerShare : 0,
+            allocPoint : _allocPoint,
             stakedAmount: 0,
             rewardSent: 0
         }));
@@ -193,28 +183,25 @@ contract RabbitStaking is Ownable {
 
     function totalStaked() public view returns (uint256){
         // uint256 valueStaked = 0;
-        uint256 amountStaked = 0;
-        for(uint pid = 0; pid<poolInfo.length; ++pid){
-            amountStaked = amountStaked.add(poolInfo[pid].stakedAmount);
-        }
-
-        return amountStaked;
+        PoolInfo storage pool = poolInfo[0];
+        return pool.stakedAmount.sub(pool.rewardSent);
     }
 
     // View function to see pending RBTs on frontend.
     function pendingRabbit(uint256 _pid, address _user) external view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_user];
-        uint256 lpSupply = pool.lpToken.balanceOf(address(this));
-        uint256 rabbitRewardPending = 0;
+        uint256 lpSupply = pool.stakedAmount.sub(pool.rewardSent);
+        uint256 accRabbitPerShare = pool.accRabbitPerShare;
 
-        if (user.lastRewardBlock > 0 && block.number > user.lastRewardBlock && lpSupply != 0) {
-            uint256 multiplier = getMultiplier(user.lastRewardBlock, block.number);
-            uint256 rabbitReward = multiplier.mul(rabbitPerBlock).mul(pool.tokenDecimal).mul(1e12);
-            rabbitRewardPending = rabbitReward.mul(user.amount).div(pool.stakedAmount).div(1e12); //weight
+        if (block.number > pool.lastRewardBlock && lpSupply != 0) {
+            uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number);
+            uint256 rabbitReward = multiplier.mul(rabbitPerBlock);
+
+            accRabbitPerShare = accRabbitPerShare.add(rabbitReward.mul(decimal_helper).div(lpSupply));
         }
 
-        return rabbitRewardPending.mul(9).div(10);
+        return user.amount.mul(accRabbitPerShare).div(decimal_helper).sub(user.rewardDebt);
     }
 
     // Update reward variables for all pools. Be careful of gas spending!
@@ -231,95 +218,67 @@ contract RabbitStaking is Ownable {
         if (block.number <= pool.lastRewardBlock) {
             return;
         }
-        uint256 lpSupply = pool.lpToken.balanceOf(address(this));
+
+        uint256 lpSupply = pool.stakedAmount.sub(pool.rewardSent);
         if (lpSupply == 0) {
             pool.lastRewardBlock = block.number;
             return;
         }
 
-        // uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number);
-        // uint256 rabbitReward = multiplier.mul(rabbitPerBlock).mul(10 ** pool.lpToken.decimals());
-        // uint256 rabbitRewardUser = user.amount.div(pool.stakedAmount).mul(rabbitReward); //weight
-
+        uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number);
+        uint256 reward = multiplier.mul(rabbitPerBlock);
+        pool.accRabbitPerShare = pool.accRabbitPerShare.add(reward.mul(decimal_helper).div(lpSupply));
         pool.lastRewardBlock = block.number;
     }
 
     // Deposit LP tokens to RabbitStaking for RBT allocation.
     function deposit(uint256 _pid, uint256 _amount) public {
-        require(!is_mountained, 'mountaining');
+        require(open_deposit, 'maintaining');
 
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
+        updatePool(_pid);
         if (user.amount > 0) {
-            uint256 lpSupply = pool.lpToken.balanceOf(address(this));
-            uint256 pending = 0;
-            if (user.lastRewardBlock >0 && block.number > user.lastRewardBlock && lpSupply != 0) {
-                uint256 multiplier = getMultiplier(user.lastRewardBlock, block.number);
-                uint256 rabbitReward = multiplier.mul(rabbitPerBlock).mul(pool.tokenDecimal).mul(1e12);
-                pending = rabbitReward.mul(user.amount).div(pool.stakedAmount).div(1e12); //weight
-            }
-
-			uint256 pendingReal = pending.mul(9).div(10);
-            if(pendingReal > 0) {
-                safeRabbitTransfer(msg.sender, pendingReal);
-                user.rewardDebt = user.rewardDebt.add(pending);
-                if(user.lastRewardBlock <= block.number)
-                    user.lastRewardBlock = block.number;
+            uint256 pending = user.amount.mul(pool.accRabbitPerShare).div(decimal_helper).sub(user.rewardDebt);
+            if (pending > 0) {
+                safeRabbitTransfer(msg.sender, pending);
                 pool.rewardSent = pool.rewardSent.add(pending);
-
-                // uint256 reward = pending.div(10);
-	    	    // pancakeRouter.swapExactTokensForETH(reward.div(2), 0, path, address(rabbit), block.timestamp+10);
+                // swapRouter.swapExactTokensForETH(reward.div(2), 0, path, address(rabbit), block.timestamp+10);
             }
         }
 
-        updatePool(_pid);
         if (_amount > 0) {
             pool.lpToken.safeTransferFrom(address(msg.sender), address(this), _amount);
             user.amount = user.amount.add(_amount);
-            if(user.lastRewardBlock <= block.number)
-                user.lastRewardBlock = block.number;
             pool.stakedAmount = pool.stakedAmount.add(_amount);
         }
 
+        user.rewardDebt = user.amount.mul(pool.accRabbitPerShare).div(decimal_helper);
         emit Deposit(msg.sender, _pid, _amount);
     }
 
     // Withdraw LP tokens from RabbitStaking.
     function withdraw(uint256 _pid, uint256 _amount) public {
-        require(!is_mountained, 'mountaining');
+        require(open_withdraw, 'maintaining');
 
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
-        require(user.amount >= _amount, "withdraw: not good");
-
-        uint256 lpSupply = pool.lpToken.balanceOf(address(this));
-        uint256 pending = 0;
-        if (user.lastRewardBlock>0 && block.number > user.lastRewardBlock && lpSupply != 0) {
-            uint256 multiplier = getMultiplier(user.lastRewardBlock, block.number);
-            uint256 rabbitReward = multiplier.mul(rabbitPerBlock).mul(pool.tokenDecimal).mul(1e12);
-            pending = rabbitReward.mul(user.amount).div(pool.stakedAmount).div(1e12); //weight
-        }
-        uint256 pendingReal = pending.mul(9).div(10);
-        if(pendingReal > 0) {
-            safeRabbitTransfer(msg.sender, pendingReal);
-            user.rewardDebt = user.rewardDebt.add(pending);
-            if(user.lastRewardBlock <= block.number)
-                user.lastRewardBlock = block.number;
-            pool.rewardSent = pool.rewardSent.add(pending);
-
-            // uint256 reward = pending.div(10);
-            // pancakeRouter.swapExactTokensForETH(reward.div(2), 0, path, address(rabbit), block.timestamp+10);
-        }
+        require(user.amount >= _amount, "exceed amount stacked");
 
         updatePool(_pid);
-        if(_amount > 0) {
-            pool.lpToken.safeTransfer(address(msg.sender), _amount);
-            user.amount = user.amount.sub(_amount);
-            if(user.lastRewardBlock <= block.number)
-                user.lastRewardBlock = block.number;
-            pool.stakedAmount = pool.stakedAmount.sub(_amount);
+        uint256 pending = user.amount.mul(pool.accRabbitPerShare).div(decimal_helper).sub(user.rewardDebt);
+        if (pending > 0) {
+            safeRabbitTransfer(msg.sender, pending);
+            pool.rewardSent = pool.rewardSent.add(pending);
         }
 
+        if (_amount > 0) {
+            user.amount = user.amount.sub(_amount);
+            pool.stakedAmount = pool.stakedAmount.sub(_amount);
+            pool.lpToken.safeTransfer(address(msg.sender), _amount);
+        }
+
+        user.rewardDebt = user.amount.mul(pool.accRabbitPerShare).div(decimal_helper);
         emit Withdraw(msg.sender, _pid, _amount);
     }
 
@@ -336,10 +295,12 @@ contract RabbitStaking is Ownable {
     // Migrate lp token to another lp contract. Can be called by anyone. We trust that migrator contract is good.
     function migrate(uint256 _pid) public {
         require(address(migrator) != address(0), "migrate: no migrator");
+
         PoolInfo storage pool = poolInfo[_pid];
         IBEP20 lpToken = pool.lpToken;
         uint256 bal = lpToken.balanceOf(address(this));
         lpToken.safeApprove(address(migrator), bal);
+
         IBEP20 newLpToken = migrator.migrate(lpToken);
         require(bal == newLpToken.balanceOf(address(this)), "migrate: bad");
         pool.lpToken = newLpToken;
